@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finnegans FileSender — Puntos de Venta</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-icon">📤</span>
+      <div>
+        <h1>Finnegans FileSender</h1>
+        <p>Subí un Excel y enviá los puntos de venta a Finnegans</p>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Paso 1: elegir archivo -->
+    <section class="card" id="card-upload">
+      <h2><span class="step">1</span> Seleccionar archivo</h2>
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="fileInput" accept=".xlsx,.xls" hidden />
+        <p class="dz-main">Arrastrá el archivo Excel acá</p>
+        <p class="dz-sub">o hacé clic para buscarlo (.xlsx)</p>
+        <p class="dz-file" id="dzFile"></p>
+      </div>
+      <div class="options-grid">
+        <div class="options-row">
+          <label for="empresaId">EmpresaID por defecto <span class="hint">(se usa si la columna SUCURSAL está vacía)</span></label>
+          <input type="text" id="empresaId" placeholder="Ej: 1 — opcional" />
+        </div>
+        <div class="options-row">
+          <label for="subtipoId">TransaccionSubtipoID por defecto <span class="hint">(si el Excel no trae la columna TRANSACCIONSUBTIPO)</span></label>
+          <input type="text" id="subtipoId" placeholder="Opcional" />
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btnParse" disabled>Analizar archivo</button>
+      <p class="error" id="parseError"></p>
+    </section>
+
+    <!-- Paso 2: vista previa -->
+    <section class="card hidden" id="card-preview">
+      <h2><span class="step">2</span> Vista previa de puntos de venta</h2>
+      <p class="summary" id="previewSummary"></p>
+      <div class="table-wrap">
+        <table id="previewTable">
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="checkAll" checked /></th>
+              <th>Nº</th>
+              <th>Comprobante</th>
+              <th>Cliente</th>
+              <th>Fecha</th>
+              <th>Ítems</th>
+              <th>Total</th>
+              <th>Payload</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" id="btnSend">Enviar seleccionados a Finnegans</button>
+        <span class="spinner hidden" id="spinner"></span>
+      </div>
+      <p class="error" id="sendError"></p>
+    </section>
+
+    <!-- Paso 3: resultado -->
+    <section class="card hidden" id="card-result">
+      <h2><span class="step">3</span> Resultado del envío</h2>
+      <p class="summary" id="resultSummary"></p>
+    </section>
+  </main>
+
+  <!-- Modal para ver el JSON del payload -->
+  <div class="modal hidden" id="jsonModal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h3 id="jsonTitle">Payload</h3>
+        <button class="btn-close" id="jsonClose">×</button>
+      </div>
+      <pre id="jsonBody"></pre>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

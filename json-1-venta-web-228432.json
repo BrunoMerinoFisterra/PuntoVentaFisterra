@@ -1,0 +1,237 @@
+{
+    "IdentificacionExterna": "PTOVTA-FV - 228432",
+    "Fecha": "2026-04-07",
+    "FechaComprobante": "2026-04-07",
+    "FechaBaseVencimiento": "2026-04-07",
+    "ClienteCodigo": "000000000070132",
+    "CondicionPagoCodigo": "00001",
+    "MonedaCodigo": "PES",
+    "ComprobanteTipoImpositivoID": "001",
+    "TransaccionTipoCodigo": "OPER",
+    "TransaccionSubtipoCodigo": "PTOVTA-FV",
+    "WorkflowCodigo": null,
+    "Descripcion": "Venta web #228432",
+    "EmpresaCodigo": "1",
+    "CAINumero": "",
+    "CAIFechaVto": null,
+    "FchDesdePeriodo": null,
+    "FchHastaPeriodo": null,
+    "Productos": [
+        {
+            "ProductoCodigo": "2210102",
+            "Precio": 27582.75,
+            "Cantidad": 1,
+            "Descripcion": null,
+            "DepositoOrigenCodigo": null,
+            "DepositoDestinoCodigo": null,
+            "CantidadStock2": 0,
+            "PrecioTipo": 0,
+            "Descuento1": 0,
+            "Descuento2": 0,
+            "ImporteExento": 0,
+            "vinculacionOrigen": null,
+            "DimensionDistribucion": [
+                {
+                    "dimensionCodigo": "DIMPARFIN",
+                    "distribucionCodigo": "",
+                    "tipoCalculo": "2",
+                    "distribucionItems": [
+                        {
+                            "codigo": "VEM08",
+                            "porcentaje": 100,
+                            "importe": 27582.75
+                        }
+                    ]
+                },
+                {
+                    "dimensionCodigo": "DIMCTC",
+                    "distribucionCodigo": "",
+                    "tipoCalculo": "2",
+                    "distribucionItems": [
+                        {
+                            "codigo": "RTO 70",
+                            "porcentaje": 100,
+                            "importe": 27582.75
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "ProductoCodigo": "2210103",
+            "Precio": 93656.83,
+            "Cantidad": 1,
+            "Descripcion": null,
+            "DepositoOrigenCodigo": null,
+            "DepositoDestinoCodigo": null,
+            "CantidadStock2": 0,
+            "PrecioTipo": 0,
+            "Descuento1": 0,
+            "Descuento2": 0,
+            "ImporteExento": 0,
+            "vinculacionOrigen": null,
+            "DimensionDistribucion": [
+                {
+                    "dimensionCodigo": "DIMPARFIN",
+                    "distribucionCodigo": "",
+                    "tipoCalculo": "2",
+                    "distribucionItems": [
+                        {
+                            "codigo": "VEM08",
+                            "porcentaje": 100,
+                            "importe": 93656.83
+                        }
+                    ]
+                },
+                {
+                    "dimensionCodigo": "DIMCTC",
+                    "distribucionCodigo": "",
+                    "tipoCalculo": "2",
+                    "distribucionItems": [
+                        {
+                            "codigo": "RTO 70",
+                            "porcentaje": 100,
+                            "importe": 93656.83
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "ProductoCodigo": "2123003",
+            "Precio": 71639.20,
+            "Cantidad": 1,
+            "Descripcion": null,
+            "DepositoOrigenCodigo": null,
+            "DepositoDestinoCodigo": null,
+            "CantidadStock2": 0,
+            "PrecioTipo": 0,
+            "Descuento1": 0,
+            "Descuento2": 0,
+            "ImporteExento": 0,
+            "vinculacionOrigen": null,
+            "DimensionDistribucion": [
+                {
+                    "dimensionCodigo": "DIMPARFIN",
+                    "distribucionCodigo": "",
+                    "tipoCalculo": "2",
+                    "distribucionItems": [
+                        {
+                            "codigo": "VEM08",
+                            "porcentaje": 100,
+                            "importe": 71639.20
+                        }
+                    ]
+                },
+                {
+                    "dimensionCodigo": "DIMCTC",
+                    "distribucionCodigo": "",
+                    "tipoCalculo": "2",
+                    "distribucionItems": [
+                        {
+                            "codigo": "RTO 70",
+                            "porcentaje": 100,
+                            "importe": 71639.20
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "ProductoCodigo": "2212008",
+            "Precio": 67040.12,
+            "Cantidad": 1,
+            "Descripcion": null,
+            "DepositoOrigenCodigo": null,
+            "DepositoDestinoCodigo": null,
+            "CantidadStock2": 0,
+            "PrecioTipo": 0,
+            "Descuento1": 0,
+            "Descuento2": 0,
+            "ImporteExento": 0,
+            "vinculacionOrigen": null,
+            "DimensionDistribucion": [
+                {
+                    "dimensionCodigo": "DIMPARFIN",
+                    "distribucionCodigo": "",
+                    "tipoCalculo": "2",
+                    "distribucionItems": [
+                        {
+                            "codigo": "VEM08",
+                            "porcentaje": 100,
+                            "importe": 67040.12
+                        }
+                    ]
+                },
+                {
+                    "dimensionCodigo": "DIMCTC",
+                    "distribucionCodigo": "",
+                    "tipoCalculo": "2",
+                    "distribucionItems": [
+                        {
+                            "codigo": "RTO 70",
+                            "porcentaje": 100,
+                            "importe": 67040.12
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "Conceptos": [
+        {
+            "ConceptoCodigo": "VENTA_IVA 10,5",
+            "ImporteEditable": false,
+            "TasaImpositiva": 10.5,
+            "ConceptoImporte": 27291.49,
+            "ConceptoImporteGravado": 259918.90
+        },
+        {
+            "ConceptoCodigo": "VENTA_IVA 21",
+            "ImporteEditable": false,
+            "TasaImpositiva": 21,
+            "ConceptoImporte": 0,
+            "ConceptoImporteGravado": 0
+        },
+        {
+            "ConceptoCodigo": "VENTA_IVA_27",
+            "ImporteEditable": false,
+            "TasaImpositiva": 27,
+            "ConceptoImporte": 0,
+            "ConceptoImporteGravado": 0
+        }
+    ],
+    "PuntoVentaItemsBanco": [],
+    "PuntoVentaItemsTarjeta": [],
+    "PuntoVentaItemsEfectivo": [],
+    "PuntoVentaItemsOtros": [
+        {
+            "CuentaCodigo": "1.1.01.002.012",
+            "DebeHaber": 1,
+            "ImporteACobrar": 287210.39,
+            "MonedaCobroCodigo": "PES"
+        }
+    ],
+    "ItemsRetencionCobranza": [],
+    "Cotizaciones": [
+        {
+            "MonedaCodigo": "PES",
+            "Cotizacion": 1
+        },
+        {
+            "MonedaCodigo": "DOL",
+            "Cotizacion": 1393
+        }
+    ],
+    "MotivoComprobanteCodigo": null,
+    "TransaccionAsociadaFCECodigo": null,
+    "ItemsRetencion": [],
+    "VendedorCodigo": "RTO 70",
+    "ObtenerCAEAutomaticamente": "",
+    "Vuelto": "0.00",
+    "TotalPagos": "287210.39",
+    "TotalBruto": "259918.90",
+    "TotalConceptos": "27291.49",
+    "Total": "287210.39",
+    "TotalRetenciones": "0"
+}

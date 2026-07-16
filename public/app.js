@@ -10,6 +10,28 @@ const spinner = $('spinner');
 let archivo = null;
 let pedidos = [];
 
+// ---------- Selector de empresas ----------
+
+async function cargarEmpresas() {
+  const select = $('empresaId');
+  try {
+    const res = await fetch('/api/empresas');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Error HTTP ${res.status}`);
+    select.innerHTML = '<option value="">Seleccioná una empresa…</option>';
+    for (const e of data.empresas) {
+      const opt = document.createElement('option');
+      opt.value = e.codigo;
+      opt.textContent = e.nombre;
+      select.appendChild(opt);
+    }
+  } catch (err) {
+    select.innerHTML = '<option value="">No se pudieron cargar las empresas — reintentá</option>';
+    console.error('Error cargando empresas:', err);
+  }
+}
+cargarEmpresas();
+
 // ---------- Paso 1: selección de archivo ----------
 
 dropzone.addEventListener('click', () => fileInput.click());

@@ -33,8 +33,10 @@
       </div>
       <div class="options-grid">
         <div class="options-row">
-          <label for="empresaId">EmpresaCodigo por defecto <span class="hint">(se usa si la columna SUCURSAL está vacía)</span></label>
-          <input type="text" id="empresaId" placeholder="Ej: eje01" />
+          <label for="empresaId">Empresa <span class="hint">(se usa si la columna SUCURSAL está vacía)</span></label>
+          <select id="empresaId">
+            <option value="">Cargando empresas…</option>
+          </select>
         </div>
         <div class="options-row">
           <label for="subtipoId">TransaccionSubtipoCodigo por defecto <span class="hint">(si el Excel no trae la columna TRANSACCIONSUBTIPO)</span></label>

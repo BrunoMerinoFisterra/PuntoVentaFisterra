@@ -10,6 +10,7 @@ const CLIENT_SECRET = process.env.FINNEGANS_CLIENT_SECRET;
 
 const TOKEN_URL = 'https://api.teamplace.finneg.com/api/oauth/token';
 const PUNTO_VENTA_URL = 'https://api.finneg.com/api/puntoVenta';
+const EMPRESAS_URL = 'https://api.finneg.com/api/empresaSucursal/list';
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -27,6 +28,28 @@ async function getAccessToken() {
   }
   return text;
 }
+
+/** Lista de empresas del tenant para el selector de EmpresaCodigo. */
+app.get('/api/empresas', async (_req, res) => {
+  try {
+    const token = await getAccessToken();
+    const response = await fetch(`${EMPRESAS_URL}?ACCESS_TOKEN=${encodeURIComponent(token)}`);
+    const text = await response.text();
+    if (!response.ok) {
+      return res.status(502).json({ error: `Finnegans respondió HTTP ${response.status}: ${text.slice(0, 200)}` });
+    }
+    let data = JSON.parse(text);
+    // La respuesta puede venir como array o envuelta en data/rows/result
+    if (!Array.isArray(data)) data = data.data ?? data.rows ?? data.result ?? [];
+    const empresas = data
+      .filter((e) => e && e.codigo && e.activo !== false)
+      .map((e) => ({ codigo: String(e.codigo), nombre: String(e.nombre ?? e.codigo) }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    res.json({ empresas });
+  } catch (err) {
+    res.status(502).json({ error: `No se pudo obtener la lista de empresas: ${err.message}` });
+  }
+});
 
 /** Sube el Excel, lo parsea y devuelve la vista previa de pedidos (no envía nada). */
 app.post('/api/parse', upload.single('archivo'), (req, res) => {

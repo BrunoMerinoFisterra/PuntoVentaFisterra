@@ -103,11 +103,11 @@ main { max-width: 1140px; margin: 26px auto; padding: 0 20px; display: grid; gap
 .options-row { display: flex; flex-direction: column; gap: 6px; flex: 1 1 320px; max-width: 440px; }
 .options-row label { font-size: 12.5px; font-weight: 600; }
 .hint { font-weight: 400; color: var(--muted); }
-.options-row input {
+.options-row input, .options-row select {
   padding: 9px 12px; border: 1px solid var(--border); border-radius: 4px;
-  font-size: 13.5px; font-family: inherit; color: var(--ink);
+  font-size: 13.5px; font-family: inherit; color: var(--ink); background: #fff;
 }
-.options-row input:focus { outline: 2px solid var(--cyan); border-color: transparent; }
+.options-row input:focus, .options-row select:focus { outline: 2px solid var(--cyan); border-color: transparent; }
 
 /* ---------- Botones (cian Finnegans GO) ---------- */
 

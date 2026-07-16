@@ -19,32 +19,29 @@ Abrí `http://localhost:4600` en el navegador:
 
 Una fila por ítem. Filas con el mismo `NUMERO` forman un mismo punto de venta. Columnas usadas:
 
-| Columna | Campo API |
+| Columna | Campo API (alias) |
 |---|---|
 | NUMERO | agrupador de comprobante |
-| COMPROBANTE | `IdentificacionExterna` |
-| FECHA | `Fecha` (dd/mm/aaaa según la doc de puntoVenta) |
-| FECHACOMPROBANTE | `FechaComprobante` |
-| FECHABASEVENCIMIENTO | `FechaBaseVencimiento` |
-| CLIENTE | `OrganizacionID` |
-| CONDICIONPAGO | `CondicionPagoID` |
-| MONEDA | `MonedaID` |
-| TIPO DE COMPROBANTE | `ComprobanteTipoImpositivoID` (ej: FC) |
-| TRANSACCIONSUBTIPO | `TransaccionSubtipoID` (o el valor por defecto de la UI) |
-| WORKFLOW | `WorkflowID` |
+| COMPROBANTE | `IdentificacionExterna` + `NumeroComprobante`; su letra inicial define `ComprobanteTipoImpositivoID` (A→001, B→006 — configurable) |
+| FECHA / FECHACOMPROBANTE / FECHABASEVENCIMIENTO | `Fecha` / `FechaComprobante` / `FechaBaseVencimiento` (aaaa-mm-dd) |
+| CLIENTE | `ClienteCodigo` |
+| CONDICIONPAGO | `CondicionPagoCodigo` |
+| MONEDA | `MonedaCodigo` |
+| TRANSACCIONSUBTIPO | `TransaccionSubtipoCodigo` (default: `PTOVTA-FV-OPERA`, editable en la UI) |
 | DESCRIPCION | `Descripcion` |
-| SUCURSAL | `EmpresaID` (o el valor por defecto de la UI) |
-| VENDEDOR | `PersonaIDVendedor` |
-| MOTIVO_CODIGO | `MotivoComprobanteID` |
-| MONEDA_COTIZACION + COTIZACION | `OperacionCotizaciones` |
-| COMPROBANTEADICIONAL | `PuntoVentaItemsTarjeta` — el primer token es el código de operación bancaria (ej: "9520 Visa" → `OperacionBancariaID: 9520`), con `ImporteACobrar` = suma de los ítems |
-| PRODUCTO | ítem: `ProductoID` |
-| DESCRIPCIONITEM | ítem: `Descripcion` |
-| CANTIDAD | ítem: `CantidadWorkflow` |
-| PRECIO | ítem: `Precio` |
-| DESCUENTO1 | ítem: `Descuento1` |
+| SUCURSAL | `EmpresaCodigo` (o el valor por defecto de la UI) |
+| MONEDA_COTIZACION + COTIZACION | `Cotizaciones` |
+| PRODUCTO / DESCRIPCIONITEM / CANTIDAD / PRECIO | ítem en `Productos` (`ProductoCodigo`, `Descripcion`, `Cantidad`, `Precio`, con `ImporteExento` = precio × cantidad) |
 
-Columnas vacías se omiten del payload. El mapeo completo vive en [mapping.js](mapping.js) — si Finnegans rechaza un campo, se ajusta ahí.
+Además el payload incluye automáticamente (según JSON validado contra el tenant):
+
+- `TransaccionTipoCodigo: OPER` y `WorkflowCodigo` omitido.
+- `Conceptos` TAX_1/TAX_4/TAX_3/TAX_5 en cero (los calcula Finnegans).
+- El cobro como `PuntoVentaItemsOtros` contra la cuenta puente `TCV` por el total del comprobante (no se usa `PuntoVentaItemsTarjeta`).
+- Totales como strings: `Total`, `TotalBruto`, `TotalPagos`, `TotalConceptos`, `TotalRetenciones`, `Vuelto`.
+- `VendedorCodigo` se omite (los códigos del Excel no existen en el tenant).
+
+Estas constantes (subtipo, cuenta de cobro, conceptos, tipos impositivos por letra, vendedor) se ajustan en el bloque `CONFIG` de [mapping.js](mapping.js). Columnas vacías se omiten del payload.
 
 ## Configuración
 

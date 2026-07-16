@@ -3,15 +3,34 @@
  *
  * El Excel tiene una fila por ítem. Las filas que comparten NUMERO forman
  * un mismo punto de venta: la cabecera se toma de la primera fila del grupo
- * y cada fila aporta un elemento de OperacionItems.
+ * y cada fila aporta un elemento de Productos.
  *
- * Referencia de campos: OpenAPI "puntoVenta" (esquema oficial de Finnegans,
- * núcleo Cuentas a Cobrar). Según la doc, Fecha y FechaBaseVencimiento van
- * en formato dd/mm/aaaa. Si Finnegans rechaza algún campo, ajustá el mapeo
- * acá — la UI muestra el payload exacto y la respuesta de la API.
+ * La estructura replica un JSON validado contra el tenant (2026-07):
+ *   - fechas en aaaa-mm-dd (la doc decía dd/mm/aaaa, pero lo que funciona es ISO)
+ *   - alias de campos (ClienteCodigo, Productos, Cantidad, ...)
+ *   - subtipo PTOVTA-FV-OPERA, WorkflowCodigo omitido
+ *   - pago en PuntoVentaItemsOtros contra la cuenta TCV (no en ItemsTarjeta)
+ *   - Conceptos TAX_* en cero y totales como strings
  */
 
 const XLSX = require('xlsx');
+
+const CONFIG = {
+  TRANSACCION_TIPO: 'OPER',
+  // Subtipo del circuito de punto de venta (sobreescribible desde la UI)
+  SUBTIPO_DEFAULT: 'PTOVTA-FV-OPERA',
+  // Tipo impositivo según la letra del comprobante (B-00003-... → B).
+  // Letras sin entrada (ej: T) hacen que el campo se omita (es opcional).
+  TIPO_IMPOSITIVO_POR_LETRA: { A: '001', B: '006' },
+  // Cuenta puente para el cobro con tarjeta (PuntoVentaItemsOtros)
+  CUENTA_PAGO_OTROS: 'TCV',
+  // Conceptos impositivos que el circuito espera (en cero, calcula Finnegans)
+  CONCEPTOS_DEFAULT: ['TAX_1', 'TAX_4', 'TAX_3', 'TAX_5'],
+  // Los códigos de vendedor del Excel (251, 263, ...) no existen en el
+  // tenant, así que el vendedor se omite. Poné un código válido (ej:
+  // 'GTC_02') para enviarlo fijo en todos los comprobantes.
+  VENDEDOR_DEFAULT: null,
+};
 
 /** Convierte fecha (Date | serial Excel | string) a partes {y, m, d}. */
 function toDateParts(value) {
@@ -24,10 +43,8 @@ function toDateParts(value) {
     return parsed ? { y: parsed.y, m: parsed.m, d: parsed.d } : null;
   }
   const str = String(value).trim();
-  // "2026-07-01 00:00:00" o "2026-07-01T00:00:00"
   const iso = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (iso) return { y: +iso[1], m: +iso[2], d: +iso[3] };
-  // "01/07/2026" (dd/mm/aaaa)
   const dmy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (dmy) return { y: +dmy[3], m: +dmy[2], d: +dmy[1] };
   return null;
@@ -35,13 +52,7 @@ function toDateParts(value) {
 
 const pad2 = (n) => String(n).padStart(2, '0');
 
-/** Formato dd/mm/aaaa — el que pide la doc de puntoVenta para Fecha. */
-function toDmyDate(value) {
-  const p = toDateParts(value);
-  return p ? `${pad2(p.d)}/${pad2(p.m)}/${p.y}` : null;
-}
-
-/** Formato aaaa-mm-dd — por si algún campo lo necesita. */
+/** Formato aaaa-mm-dd (el que acepta el tenant en la práctica). */
 function toIsoDate(value) {
   const p = toDateParts(value);
   return p ? `${p.y}-${pad2(p.m)}-${pad2(p.d)}` : null;
@@ -59,7 +70,9 @@ function toStringOrNull(value) {
   return str === '' ? null : str;
 }
 
-/** Elimina claves null/undefined/'' y arrays vacíos (mismo patrón que FSTrack). */
+const round2 = (n) => Math.round(n * 100) / 100;
+
+/** Elimina claves null/undefined/'' y arrays vacíos (0 y false se conservan). */
 function cleanObject(obj) {
   if (Array.isArray(obj)) {
     const arr = obj.map(cleanObject).filter((v) => v != null);
@@ -97,22 +110,11 @@ function parseRows(buffer) {
   });
 }
 
-/**
- * Medio de pago con tarjeta a partir de COMPROBANTEADICIONAL ("9520 Visa"):
- * el primer token numérico es el código de operación bancaria.
- */
-function buildItemsTarjeta(head, totalPedido, moneda) {
-  const adicional = toStringOrNull(head.COMPROBANTEADICIONAL);
-  if (!adicional) return null;
-  const codigo = adicional.split(/\s+/)[0];
-  return [
-    {
-      OperacionBancariaID: codigo,
-      ImporteACobrar: totalPedido,
-      MonedaCobroCodigo: moneda,
-      Descripcion: adicional,
-    },
-  ];
+/** Tipo impositivo a partir de la letra del comprobante ("B-00003-..." → "006"). */
+function tipoImpositivoDeComprobante(comprobante) {
+  if (!comprobante) return null;
+  const letra = String(comprobante).trim().charAt(0).toUpperCase();
+  return CONFIG.TIPO_IMPOSITIVO_POR_LETRA[letra] ?? null;
 }
 
 /**
@@ -120,9 +122,7 @@ function buildItemsTarjeta(head, totalPedido, moneda) {
  * payload de puntoVenta por grupo.
  *
  * @param rows filas normalizadas del Excel
- * @param defaults valores por defecto opcionales desde la UI:
- *   { empresaId, subtipoId } — se usan cuando la columna correspondiente
- *   (SUCURSAL / TRANSACCIONSUBTIPO) viene vacía.
+ * @param defaults valores opcionales desde la UI: { empresaId, subtipoId }
  */
 function buildPedidos(rows, defaults = {}) {
   const grupos = new Map();
@@ -135,53 +135,81 @@ function buildPedidos(rows, defaults = {}) {
   const pedidos = [];
   for (const [numero, filas] of grupos) {
     const head = filas[0].row;
-    const identificacion = toStringOrNull(head.COMPROBANTE) ?? `PV-${numero}`;
+    const comprobante = toStringOrNull(head.COMPROBANTE);
     const moneda = toStringOrNull(head.MONEDA);
 
-    const total = Math.round(
+    const total = round2(
       filas.reduce((sum, { row }) => {
         const cant = toNumberOrNull(row.CANTIDAD) ?? 0;
         const precio = toNumberOrNull(row.PRECIO) ?? 0;
         return sum + cant * precio;
-      }, 0) * 100
-    ) / 100;
+      }, 0)
+    );
 
     const payload = cleanObject({
-      IdentificacionExterna: identificacion,
-      Fecha: toDmyDate(head.FECHA),
-      FechaComprobante: toDmyDate(head.FECHACOMPROBANTE),
-      FechaBaseVencimiento: toDmyDate(head.FECHABASEVENCIMIENTO),
-      OrganizacionID: toStringOrNull(head.CLIENTE),
-      CondicionPagoID: toStringOrNull(head.CONDICIONPAGO),
-      MonedaID: moneda,
-      ComprobanteTipoImpositivoID: toStringOrNull(head['TIPO DE COMPROBANTE']),
-      TransaccionSubtipoID:
-        toStringOrNull(head.TRANSACCIONSUBTIPO) ?? toStringOrNull(defaults.subtipoId),
-      WorkflowID: toStringOrNull(head.WORKFLOW),
+      IdentificacionExterna: comprobante ?? `PV-${numero}`,
+      Fecha: toIsoDate(head.FECHA),
+      FechaComprobante: toIsoDate(head.FECHACOMPROBANTE),
+      FechaBaseVencimiento: toIsoDate(head.FECHABASEVENCIMIENTO),
+      ClienteCodigo: toStringOrNull(head.CLIENTE),
+      CondicionPagoCodigo: toStringOrNull(head.CONDICIONPAGO),
+      MonedaCodigo: moneda,
+      ComprobanteTipoImpositivoID: tipoImpositivoDeComprobante(comprobante),
+      TransaccionTipoCodigo: CONFIG.TRANSACCION_TIPO,
+      TransaccionSubtipoCodigo:
+        toStringOrNull(head.TRANSACCIONSUBTIPO) ??
+        toStringOrNull(defaults.subtipoId) ??
+        CONFIG.SUBTIPO_DEFAULT,
       Descripcion: toStringOrNull(head.DESCRIPCION),
-      EmpresaID: toStringOrNull(head.SUCURSAL) ?? toStringOrNull(defaults.empresaId),
-      PersonaIDVendedor: toStringOrNull(head.VENDEDOR),
-      MotivoComprobanteID: toStringOrNull(head.MOTIVO_CODIGO),
-      OperacionCotizaciones:
-        toStringOrNull(head.MONEDA_COTIZACION) != null
-          ? [{ MonedaID: toStringOrNull(head.MONEDA_COTIZACION), Cotizacion: toNumberOrNull(head.COTIZACION) }]
-          : null,
-      OperacionItems: filas.map(({ row }) => ({
-        ProductoID: toStringOrNull(row.PRODUCTO),
-        Descripcion: toStringOrNull(row.DESCRIPCIONITEM),
-        CantidadWorkflow: toNumberOrNull(row.CANTIDAD),
-        Precio: toNumberOrNull(row.PRECIO),
-        Descuento1: toNumberOrNull(row.DESCUENTO1),
+      NumeroComprobante: comprobante,
+      EmpresaCodigo: toStringOrNull(head.SUCURSAL) ?? toStringOrNull(defaults.empresaId),
+      VendedorCodigo: CONFIG.VENDEDOR_DEFAULT,
+      Productos: filas.map(({ row }) => {
+        const cantidad = toNumberOrNull(row.CANTIDAD);
+        const precio = toNumberOrNull(row.PRECIO);
+        return {
+          ProductoCodigo: toStringOrNull(row.PRODUCTO),
+          Precio: precio,
+          Cantidad: cantidad,
+          Descripcion: toStringOrNull(row.DESCRIPCIONITEM),
+          PrecioTipo: 0,
+          Descuento1: toNumberOrNull(row.DESCUENTO1) ?? 0,
+          Descuento2: toNumberOrNull(row.DESCUENTO2) ?? 0,
+          ImporteExento: precio != null && cantidad != null ? round2(precio * cantidad) : null,
+        };
+      }),
+      Conceptos: CONFIG.CONCEPTOS_DEFAULT.map((codigo) => ({
+        ConceptoCodigo: codigo,
+        ImporteEditable: false,
+        ConceptoImporte: 0,
+        ConceptoImporteGravado: 0,
       })),
-      PuntoVentaItemsTarjeta: buildItemsTarjeta(head, total, moneda),
+      PuntoVentaItemsOtros: [
+        {
+          CuentaCodigo: CONFIG.CUENTA_PAGO_OTROS,
+          DebeHaber: 1,
+          ImporteACobrar: total,
+          MonedaCobroCodigo: moneda,
+        },
+      ],
+      Cotizaciones:
+        toStringOrNull(head.MONEDA_COTIZACION) != null
+          ? [{ MonedaCodigo: toStringOrNull(head.MONEDA_COTIZACION), Cotizacion: toNumberOrNull(head.COTIZACION) }]
+          : null,
+      Vuelto: '0.00',
+      TotalBruto: total.toFixed(2),
+      TotalConceptos: '0.00',
+      Total: total.toFixed(2),
+      TotalRetenciones: '0',
+      TotalPagos: total.toFixed(2),
     });
 
     pedidos.push({
       numero,
-      comprobante: toStringOrNull(head.COMPROBANTE),
+      comprobante,
       cliente: toStringOrNull(head.CLIENTE),
       descripcion: toStringOrNull(head.DESCRIPCION),
-      fecha: toDmyDate(head.FECHA),
+      fecha: toIsoDate(head.FECHA),
       items: filas.length,
       filasExcel: filas.map((f) => f.excelRow),
       total,
@@ -191,4 +219,4 @@ function buildPedidos(rows, defaults = {}) {
   return pedidos;
 }
 
-module.exports = { parseRows, buildPedidos, cleanObject, toDmyDate, toIsoDate };
+module.exports = { parseRows, buildPedidos, cleanObject, toIsoDate, CONFIG };

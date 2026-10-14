@@ -6,9 +6,11 @@ const dzFile = $('dzFile');
 const btnParse = $('btnParse');
 const btnSend = $('btnSend');
 const spinner = $('spinner');
+const sendProgress = $('sendProgress');
 
 let archivo = null;
 let pedidos = [];
+const TAMANO_LOTE = 40;
 
 // ---------- Selector de empresas ----------
 
@@ -64,6 +66,7 @@ btnParse.addEventListener('click', async () => {
     form.append('archivo', archivo);
     form.append('empresaId', $('empresaId').value.trim());
     form.append('subtipoId', $('subtipoId').value.trim());
+    form.append('subtipoNotaCreditoId', $('subtipoNotaCreditoId').value.trim());
     const res = await fetch('/api/parse', { method: 'POST', body: form });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `Error HTTP ${res.status}`);
@@ -87,9 +90,10 @@ function renderPreview(data) {
   pedidos.forEach((p, i) => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><input type="checkbox" class="chk" data-i="${i}" checked /></td>
+      <td><input type="checkbox" class="chk" data-i="${i}" ${p.errores?.length ? 'disabled' : 'checked'} /></td>
       <td>${escapeHtml(p.numero)}</td>
       <td>${escapeHtml(p.comprobante ?? '—')}</td>
+      <td>${escapeHtml(p.tipoComprobante ?? '—')}</td>
       <td>${escapeHtml(p.cliente ?? '—')}</td>
       <td>${escapeHtml(p.fecha ?? '—')}</td>
       <td class="num">${p.items}</td>
@@ -97,6 +101,7 @@ function renderPreview(data) {
       <td><button class="btn-link" data-json="${i}">Ver JSON</button></td>
       <td><span class="badge badge-pending" id="estado-${i}">Pendiente</span></td>`;
     tbody.appendChild(tr);
+    if (p.errores?.length) setEstado(i, 'err', p.errores.join(' '));
   });
 
   tbody.querySelectorAll('[data-json]').forEach((btn) =>
@@ -106,11 +111,16 @@ function renderPreview(data) {
   $('card-preview').classList.remove('hidden');
   $('card-result').classList.add('hidden');
   $('sendError').textContent = '';
+  const bloqueados = pedidos.filter((p) => p.errores?.length).length;
+  if (bloqueados) $('sendError').textContent = `${bloqueados} punto(s) de venta bloqueados por errores en COMPROBANTEADICIONAL. Corregí el archivo y volvé a analizarlo. Los demás se pueden enviar.`;
+  btnSend.disabled = bloqueados === pedidos.length;
+  sendProgress.textContent = '';
+  sendProgress.classList.add('hidden');
   $('card-preview').scrollIntoView({ behavior: 'smooth' });
 }
 
 $('checkAll').addEventListener('change', (e) => {
-  document.querySelectorAll('.chk').forEach((c) => (c.checked = e.target.checked));
+  document.querySelectorAll('.chk:not(:disabled)').forEach((c) => (c.checked = e.target.checked));
 });
 
 // ---------- Modal JSON ----------
@@ -129,7 +139,7 @@ $('jsonModal').addEventListener('click', (e) => {
 
 btnSend.addEventListener('click', async () => {
   const seleccion = [...document.querySelectorAll('.chk')]
-    .filter((c) => c.checked)
+    .filter((c) => c.checked && !c.disabled && !pedidos[Number(c.dataset.i)].errores?.length)
     .map((c) => Number(c.dataset.i));
   if (!seleccion.length) {
     $('sendError').textContent = 'Seleccioná al menos un punto de venta.';
@@ -139,30 +149,81 @@ btnSend.addEventListener('click', async () => {
 
   btnSend.disabled = true;
   spinner.classList.remove('hidden');
+  sendProgress.textContent = `0 de ${seleccion.length} ingresados OK`;
+  sendProgress.classList.remove('hidden');
   $('sendError').textContent = '';
   seleccion.forEach((i) => setEstado(i, 'pending', 'Enviando…'));
 
+  let ok = 0;
+  let procesados = 0;
+  const procesadosIndices = new Set();
+  const resultados = [];
+
   try {
-    const res = await fetch('/api/enviar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pedidos: seleccion.map((i) => pedidos[i]) }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || `Error HTTP ${res.status}`);
+    for (let inicio = 0; inicio < seleccion.length; inicio += TAMANO_LOTE) {
+      const lote = seleccion.slice(inicio, inicio + TAMANO_LOTE);
+      const numeroLote = Math.floor(inicio / TAMANO_LOTE) + 1;
+      const totalLotes = Math.ceil(seleccion.length / TAMANO_LOTE);
 
-    let ok = 0;
-    data.resultados.forEach((r, idx) => {
-      const i = seleccion[idx];
-      if (r.ok) {
-        ok++;
-        setEstado(i, 'ok', `Enviado (${r.status})`);
-      } else {
-        setEstado(i, 'err', `Error (${r.status || 'red'})`, r.respuesta);
+      const res = await fetch('/api/enviar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ pedidos: lote.map((i) => pedidos[i]) }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(`Falló el lote ${numeroLote} de ${totalLotes}: ${data.error || `Error HTTP ${res.status}`}`);
       }
-    });
 
-    const fallidos = data.resultados.length - ok;
+      if (!res.body) throw new Error('El navegador no pudo leer el progreso del envío.');
+
+      let procesadosLote = 0;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      const procesarLinea = (linea) => {
+        if (!linea.trim()) return;
+        const evento = JSON.parse(linea);
+        if (evento.tipo !== 'resultado') return;
+
+        const r = evento.resultado;
+        const i = lote[evento.indice];
+        resultados.push(r);
+        procesados++;
+        procesadosLote++;
+        procesadosIndices.add(i);
+        if (r.ok) {
+          ok++;
+          setEstado(i, 'ok', `Enviado (${r.status})`);
+        } else {
+          setEstado(i, 'err', `Error (${r.status || 'red'})`, r.respuesta);
+        }
+        sendProgress.textContent = `${ok} de ${seleccion.length} ingresados OK`;
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+        const lineas = buffer.split('\n');
+        buffer = lineas.pop() || '';
+        lineas.forEach(procesarLinea);
+        if (done) break;
+      }
+      procesarLinea(buffer);
+
+      if (procesadosLote !== lote.length) {
+        throw new Error(
+          `El lote ${numeroLote} de ${totalLotes} se interrumpió después de procesar ` +
+          `${procesadosLote} de ${lote.length} registros. Avance total: ${procesados} de ${seleccion.length}.`
+        );
+      }
+    }
+
+    const fallidos = resultados.length - ok;
     $('resultSummary').innerHTML =
       `<strong>${ok}</strong> punto(s) de venta enviados correctamente` +
       (fallidos ? `, <strong>${fallidos}</strong> con error. Hacé clic en el estado rojo para ver el detalle.` : '.');
@@ -170,7 +231,9 @@ btnSend.addEventListener('click', async () => {
     $('card-result').scrollIntoView({ behavior: 'smooth' });
   } catch (err) {
     $('sendError').textContent = err.message;
-    seleccion.forEach((i) => setEstado(i, 'pending', 'Pendiente'));
+    seleccion
+      .filter((i) => !procesadosIndices.has(i))
+      .forEach((i) => setEstado(i, 'pending', 'Pendiente'));
   } finally {
     btnSend.disabled = false;
     spinner.classList.add('hidden');
